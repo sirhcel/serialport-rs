@@ -38,6 +38,7 @@ features = [
 ]
 
 [dependencies]
+embedded-hal-0-2 = { package = "embedded-hal", version = "0.2.7", optional = true }
 embedded-hal-1-0 = { package = "embedded-hal", version = "=1.0.0-alpha.8", optional = true }
 nb = { version = "1", optional = true }
 serde = { version = "1.0", features = ["derive"], optional = true }
@@ -47,4 +48,5 @@ clap = "3.1.6"
 
 [features]
 default = ["libudev"]
+embedded-hal-0-2 = ["dep:embedded-hal-0-2", "dep:nb"]
 embedded-hal-1-0 = ["dep:embedded-hal-1-0", "dep:nb"]
