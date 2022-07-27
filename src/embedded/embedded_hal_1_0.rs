@@ -4,7 +4,7 @@
 
 use std::io;
 
-use embedded_hal::serial;
+use embedded_hal_1_0::serial;
 
 use crate::SerialPort;
 
