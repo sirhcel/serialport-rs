@@ -17,6 +17,8 @@ use crate::{
 /// Convenience method for removing exclusive access from
 /// a fd and closing it.
 fn close(fd: RawFd) {
+    println!("posix::tty:close({:?})", fd);
+
     // remove exclusive access
     let _ = ioctl::tiocnxcl(fd);
 
@@ -79,6 +81,7 @@ struct OwnedFd(RawFd);
 
 impl Drop for OwnedFd {
     fn drop(&mut self) {
+        println!("OwnedFd::drop");
         close(self.0);
     }
 }
@@ -358,6 +361,7 @@ impl TTYPort {
 
 impl Drop for TTYPort {
     fn drop(&mut self) {
+        println!("TTYPort::drop");
         close(self.fd);
     }
 }
