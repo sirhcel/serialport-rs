@@ -1,6 +1,8 @@
 use serialport::{available_ports, SerialPortType};
 
 fn main() {
+    env_logger::init();
+
     match available_ports() {
         Ok(ports) => {
             match ports.len() {
