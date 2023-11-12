@@ -458,8 +458,6 @@ cfg_if! {
             Ok(vec)
         }
     } else if #[cfg(target_os = "linux")] {
-        use std::fs::File;
-        use std::io::Read;
         use std::path::Path;
 
         /// Scans `/sys/class/tty` for serial devices (on Linux systems without libudev).
@@ -467,23 +465,14 @@ cfg_if! {
             let mut vec = Vec::new();
             let sys_path = Path::new("/sys/class/tty/");
             let device_path = Path::new("/dev");
-            let mut s;
             for path in sys_path.read_dir().expect("/sys/class/tty/ doesn't exist on this system") {
                 let raw_path = path?.path().clone();
                 let mut path = raw_path.clone();
 
+                // Consider all TTYs with an associated device a serial port.
                 path.push("device");
                 if !path.is_dir() {
                     continue;
-                }
-
-                path.push("driver_override");
-                if path.is_file() {
-                    s = String::new();
-                    File::open(path)?.read_to_string(&mut s)?;
-                    if &s == "(null)\n" {
-                        continue;
-                    }
                 }
 
                 // Generate the device file path `/dev/DEVICE` from the TTY class path
