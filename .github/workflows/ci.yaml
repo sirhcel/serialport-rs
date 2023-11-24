@@ -49,13 +49,30 @@ jobs:
   # --------------------------------------------------------------------------
   # MSRV
 
-  msrv:
+  msrv-aarch64-apple-darwin:
+    uses: ./.github/workflows/build.yaml
+    with:
+      disable_extra_builds: true
+      disable_tests: true
+      target: aarch64-apple-darwin
+      toolchain: "1.59.0"
+
+  msrv-x86_64-unknown-linux-gnu:
     uses: ./.github/workflows/build.yaml
     with:
       disable_extra_builds: true
       disable_tests: true
       extra_packages: libudev-dev
       target: x86_64-unknown-linux-gnu
+      toolchain: "1.59.0"
+
+  msrv-x86_64-pc-windows-msvc:
+    uses: ./.github/workflows/build.yaml
+    with:
+      disable_extra_builds: true
+      disable_tests: true
+      runs_on: windows-2019
+      target: x86_64-pc-windows-msvc
       toolchain: "1.59.0"
 
   # --------------------------------------------------------------------------
