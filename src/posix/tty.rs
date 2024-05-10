@@ -616,8 +616,8 @@ impl SerialPort for TTYPort {
         }
     }
 
-    fn timeout(&self) -> Option<Duration> {
-        self.timeout
+    fn timeout(&self) -> Duration {
+        self.timeout.unwrap_or(crate::NO_TIMEOUT)
     }
 
     #[cfg(any(
@@ -678,8 +678,16 @@ impl SerialPort for TTYPort {
         return termios::set_termios(self.fd, &termios);
     }
 
-    fn set_timeout(&mut self, timeout: Option<Duration>) -> Result<()> {
-        self.timeout = timeout;
+    fn set_timeout(&mut self, timeout: Duration) -> Result<()> {
+        self.timeout = match timeout {
+            Duration::MAX => None,
+            t => Some(t),
+        };
+        Ok(())
+    }
+
+    fn set_no_timeout(&mut self) -> Result<()> {
+        self.timeout = None;
         Ok(())
     }
 

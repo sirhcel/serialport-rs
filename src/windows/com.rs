@@ -28,7 +28,7 @@ use crate::{
 #[derive(Debug)]
 pub struct COMPort {
     handle: HANDLE,
-    timeout: Duration,
+    timeout: Option<Duration>,
     port_name: Option<String>,
 }
 
@@ -85,7 +85,7 @@ impl COMPort {
         dcb::set_flow_control(&mut dcb, builder.flow_control);
         dcb::set_dcb(handle, dcb)?;
 
-        com.set_timeout(builder.timeout)?;
+        com.set_timeout_opt(builder.timeout)?;
         com.port_name = Some(builder.path.clone());
         Ok(com)
     }
@@ -150,9 +150,41 @@ impl COMPort {
         // We'll punt and set it `None` here.
         COMPort {
             handle: handle as HANDLE,
-            timeout: Duration::from_millis(100),
+            timeout: Some(Duration::from_millis(100)),
             port_name: None,
         }
+    }
+
+    fn set_timeout_opt(&mut self, timeout: Option<Duration>) -> Result<()> {
+        let mut timeouts = match timeout {
+            None | Some(Duration::MAX) => COMMTIMEOUTS {
+                ReadIntervalTimeout: 0,
+                ReadTotalTimeoutMultiplier: 0,
+                ReadTotalTimeoutConstant: 0,
+                WriteTotalTimeoutMultiplier: 0,
+                WriteTotalTimeoutConstant: 0,
+            },
+            // TODO: We already know that setting a zero duration actually results in no timeout with
+            // the setup below. This is about getting fixed with
+            // https://github.com/serialport/serialport-rs/pull/79.
+            Some(duration) => {
+                let milliseconds = duration.as_millis();
+                COMMTIMEOUTS {
+                    ReadIntervalTimeout: 0,
+                    ReadTotalTimeoutMultiplier: 0,
+                    ReadTotalTimeoutConstant: milliseconds as DWORD,
+                    WriteTotalTimeoutMultiplier: 0,
+                    WriteTotalTimeoutConstant: milliseconds as DWORD,
+                }
+            }
+        };
+
+        if unsafe { SetCommTimeouts(self.handle, &mut timeouts) } == 0 {
+            return Err(super::error::last_os_error());
+        }
+
+        self.timeout = timeout;
+        Ok(())
     }
 }
 
@@ -236,26 +268,15 @@ impl SerialPort for COMPort {
     }
 
     fn timeout(&self) -> Duration {
-        self.timeout
+        self.timeout.unwrap_or(crate::NO_TIMEOUT)
     }
 
     fn set_timeout(&mut self, timeout: Duration) -> Result<()> {
-        let milliseconds = timeout.as_millis();
+        self.set_timeout_opt(Some(timeout))
+    }
 
-        let mut timeouts = COMMTIMEOUTS {
-            ReadIntervalTimeout: 0,
-            ReadTotalTimeoutMultiplier: 0,
-            ReadTotalTimeoutConstant: milliseconds as DWORD,
-            WriteTotalTimeoutMultiplier: 0,
-            WriteTotalTimeoutConstant: milliseconds as DWORD,
-        };
-
-        if unsafe { SetCommTimeouts(self.handle, &mut timeouts) } == 0 {
-            return Err(super::error::last_os_error());
-        }
-
-        self.timeout = timeout;
-        Ok(())
+    fn set_no_timeout(&mut self) -> Result<()> {
+        self.set_timeout_opt(None)
     }
 
     fn write_request_to_send(&mut self, level: bool) -> Result<()> {

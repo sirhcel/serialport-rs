@@ -52,6 +52,9 @@ pub use windows::COMPort;
 /// The `Err` type is hard-wired to [`serialport::Error`](struct.Error.html).
 pub type Result<T> = std::result::Result<T, Error>;
 
+/// In-band signalling value for having no timeout.
+pub const NO_TIMEOUT: Duration = Duration::MAX;
+
 /// Categories of errors that can occur when interacting with serial ports
 ///
 /// This list is intended to grow over time and it is not recommended to
@@ -379,6 +382,13 @@ impl SerialPortBuilder {
         self
     }
 
+    /// Sets not timing out when waiting to receive data
+    #[must_use]
+    pub fn no_timeout(mut self) -> Self {
+        self.timeout = None;
+        self
+    }
+
     /// Open a cross-platform interface to the port with the specified settings
     pub fn open(self) -> Result<Box<dyn SerialPort>> {
         #[cfg(unix)]
@@ -459,7 +469,7 @@ pub trait SerialPort: Send + io::Read + io::Write {
     fn stop_bits(&self) -> Result<StopBits>;
 
     /// Returns the current timeout.
-    fn timeout(&self) -> Option<Duration>;
+    fn timeout(&self) -> Duration;
 
     // Port settings setters
 
@@ -485,7 +495,10 @@ pub trait SerialPort: Send + io::Read + io::Write {
     fn set_stop_bits(&mut self, stop_bits: StopBits) -> Result<()>;
 
     /// Sets the timeout for future I/O operations.
-    fn set_timeout(&mut self, timeout: Option<Duration>) -> Result<()>;
+    fn set_timeout(&mut self, timeout: Duration) -> Result<()>;
+
+    /// Sets no timeout for future I/O operations.
+    fn set_no_timeout(&mut self) -> Result<()>;
 
     // Functions for setting non-data control signal pins
 
@@ -647,7 +660,7 @@ impl<T: SerialPort> SerialPort for &mut T {
         (**self).stop_bits()
     }
 
-    fn timeout(&self) -> Option<Duration> {
+    fn timeout(&self) -> Duration {
         (**self).timeout()
     }
 
@@ -671,8 +684,12 @@ impl<T: SerialPort> SerialPort for &mut T {
         (**self).set_stop_bits(stop_bits)
     }
 
-    fn set_timeout(&mut self, timeout: Option<Duration>) -> Result<()> {
+    fn set_timeout(&mut self, timeout: Duration) -> Result<()> {
         (**self).set_timeout(timeout)
+    }
+
+    fn set_no_timeout(&mut self) -> Result<()> {
+        (**self).set_no_timeout()
     }
 
     fn write_request_to_send(&mut self, level: bool) -> Result<()> {
