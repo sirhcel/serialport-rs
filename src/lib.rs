@@ -829,7 +829,7 @@ pub fn new<'a>(path: impl Into<std::borrow::Cow<'a, str>>, baud_rate: u32) -> Se
         flow_control: FlowControl::None,
         parity: Parity::None,
         stop_bits: StopBits::One,
-        timeout: None,
+        timeout: Some(Duration::from_millis(0)),
     }
 }
 
