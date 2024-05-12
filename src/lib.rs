@@ -495,7 +495,7 @@ pub trait SerialPort: Send + io::Read + io::Write {
     fn set_stop_bits(&mut self, stop_bits: StopBits) -> Result<()>;
 
     /// Sets the timeout for future I/O operations.
-    fn set_timeout(&mut self, timeout: Duration) -> Result<()>;
+    fn set_timeout<D: Into<Option<Duration>>>(&mut self, timeout: D) -> Result<()>;
 
     /// Sets no timeout for future I/O operations.
     fn set_no_timeout(&mut self) -> Result<()>;
@@ -684,8 +684,8 @@ impl<T: SerialPort> SerialPort for &mut T {
         (**self).set_stop_bits(stop_bits)
     }
 
-    fn set_timeout(&mut self, timeout: Duration) -> Result<()> {
-        (**self).set_timeout(timeout)
+    fn set_timeout<D: Into<Option<Duration>>>(&mut self, timeout: D) -> Result<()> {
+        (**self).set_timeout(timeout.into())
     }
 
     fn set_no_timeout(&mut self) -> Result<()> {
