@@ -237,6 +237,7 @@ fn port_type(d: &libudev::Device) -> Result<SerialPortType> {
 //  isc    02  (interface subclass)
 //  ip     00  (interface protocol)
 //  in     00  (interface number)
+#[cfg(all(target_os = "linux", not(target_env = "musl"), feature = "libudev"))]
 fn parse_modalias(moda: &str) -> Option<UsbPortInfo> {
     // Find the start of the string, will start with "usb:"
     let mod_start = moda.find("usb:v")?;
@@ -691,6 +692,7 @@ cfg_if! {
     }
 }
 
+#[cfg(all(target_os = "linux", not(target_env = "musl"), feature = "libudev"))]
 #[test]
 fn parser_modalias() {
     const MODALIAS: &str = "usb:v303Ap1001d0101dcEFdsc02dp01ic02isc02ip00in0C";
