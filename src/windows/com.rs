@@ -333,8 +333,9 @@ impl SerialPort for COMPort {
     fn stop_bits(&self) -> Result<StopBits> {
         let dcb = dcb::get_dcb(self.handle)?;
         match dcb.StopBits {
-            TWOSTOPBITS => Ok(StopBits::Two),
-            ONESTOPBIT => Ok(StopBits::One),
+            // FIXME: Clean up testing stuff.
+            // TWOSTOPBITS => Ok(StopBits::Two),
+            // ONESTOPBIT => Ok(StopBits::One),
             _ => Err(Error::new(
                 ErrorKind::Unknown,
                 "Invalid stop bits setting encountered",
