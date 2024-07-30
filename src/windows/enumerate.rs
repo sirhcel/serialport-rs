@@ -244,6 +244,7 @@ impl PortDevice {
         let mut parents = unsafe { ParentInstances::from_handle(self.devinfo_data.DevInst) };
         parents.next().and_then(|p| {
             let id = unsafe { cm::device_id(p) };
+            dbg!(&id);
             id.ok()
         })
     }
@@ -338,6 +339,18 @@ impl PortDevice {
 
     // Determines the port_type for this device, and if it's a USB port populate the various fields.
     pub fn port_type(&mut self) -> SerialPortType {
+        let parents = unsafe { ParentInstances::from_handle(self.devinfo_data.DevInst) };
+        let stack: Vec<String> = std::iter::once(self.devinfo_data.DevInst)
+            .chain(parents)
+            .map(|p| {
+                let id = unsafe { cm::device_id(p) };
+                id.ok()
+            })
+            .enumerate()
+            .map(|(index, id)| format!("{}: {:?}", index, id))
+            .collect();
+        dbg!(stack);
+
         self.instance_id()
             .map(|s| (s, self.parent_instance_id())) // Get parent instance id if it exists.
             .and_then(|(d, p)| parse_usb_port_info(&d, p.as_deref()))
