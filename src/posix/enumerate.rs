@@ -345,10 +345,12 @@ fn get_string_property(device_type: io_registry_entry_t, property: &str) -> Resu
     }
 
     let cf_type = unsafe { CFType::wrap_under_create_rule(cf_type_ref) };
-    cf_type
+    let result = cf_type
         .downcast::<CFString>()
         .map(|s| s.to_string())
-        .ok_or(Error::new(ErrorKind::Unknown, "Failed to get string value"))
+        .ok_or(Error::new(ErrorKind::Unknown, "Failed to get string value"));
+    std::mem::forget(cf_type);
+    result
 }
 
 #[cfg(any(target_os = "ios", target_os = "macos"))]
