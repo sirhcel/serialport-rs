@@ -9,7 +9,7 @@ project adheres to [Semantic Versioning](https://semver.org/).
 ### Added
 ### Changed
 
-* Switched from core-foundation-sys to core-foundation for more conviniently
+* Switched from core-foundation-sys to core-foundation for more conveniently
   working with Core Foundation types for enumeration on macOS.
   [#218](https://github.com/serialport/serialport-rs/pull/218)
 
