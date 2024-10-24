@@ -8,6 +8,10 @@ project adheres to [Semantic Versioning](https://semver.org/).
 ## [Unreleased]
 
 ### Added
+
+* Added `Mark` and `Space` variants to `Parity` enum
+  [#189](https://github.com/serialport/serialport-rs/pull/189)
+
 ### Changed
 ### Fixed
 ### Removed
