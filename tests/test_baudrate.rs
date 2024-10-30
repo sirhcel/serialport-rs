@@ -3,8 +3,9 @@ mod config;
 use config::{hw_config, HardwareConfig};
 use rstest::rstest;
 use rstest_reuse::{self, apply, template};
-use serialport::SerialPort;
+use serialport::{ClearBuffer, SerialPort};
 use std::ops::Range;
+use std::time::Duration;
 
 const RESET_BAUD_RATE: u32 = 300;
 
@@ -28,6 +29,31 @@ fn check_baud_rate(port: &dyn SerialPort, baud: u32) {
     let accepted = accepted_actual_baud_for(baud);
     let actual = port.baud_rate().unwrap();
     assert!(accepted.contains(&actual));
+}
+
+fn check_transmission(sender: &str, receiver: &str, baud: u32) {
+    const MESSAGE: &[u8; 79] =
+        b"0123456789:;<=>?@ABCDEFGHIJKLMNOPQRSTUVWXYZ[\\]^_`abcdefghijklmnopqrstuvwxyz{|}~";
+    let timeout = Duration::from_secs(1);
+    let mut sender = serialport::new(sender, baud)
+        .timeout(timeout)
+        .open()
+        .unwrap();
+    let mut receiver = serialport::new(receiver, baud)
+        .timeout(timeout)
+        .open()
+        .unwrap();
+
+    sender.clear(ClearBuffer::All).unwrap();
+    receiver.clear(ClearBuffer::All).unwrap();
+
+    sender.write_all(MESSAGE).unwrap();
+    sender.flush().unwrap();
+
+    let mut buffer = [0u8; MESSAGE.len()];
+    receiver.read_exact(&mut buffer).unwrap();
+
+    assert_eq!(MESSAGE, &buffer);
 }
 
 #[template]
@@ -199,5 +225,26 @@ mod set_baud {
 
         port.set_baud_rate(baud).unwrap();
         check_baud_rate(port.as_ref(), baud);
+    }
+}
+
+mod transmit {
+    use super::*;
+
+    #[apply(standard_baud_rates)]
+    fn test_standard_baud_rate(hw_config: HardwareConfig, #[case] baud: u32) {
+        check_transmission(&hw_config.port_1, &hw_config.port_2, baud);
+    }
+
+    #[apply(non_standard_baud_rates)]
+    #[cfg_attr(
+        any(
+            feature = "ignore-hardware-tests",
+            all(target_os = "linux", target_env = "musl"),
+        ),
+        ignore
+    )]
+    fn test_non_standard_baud_rates(hw_config: HardwareConfig, #[case] baud: u32) {
+        check_transmission(&hw_config.port_1, &hw_config.port_2, baud);
     }
 }
