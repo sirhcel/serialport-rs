@@ -12,7 +12,15 @@ const RESET_BAUD_RATE: u32 = 300;
 /// the supplied value. For example, the CP2102 driver on Linux returns the baud rate actually
 /// configured a the device rather than the the value set.
 fn accepted_actual_baud_for(baud: u32) -> Range<u32> {
-    let delta = baud / 200;
+    let divisor = if baud > 1_000_000 {
+        // Be more leninet with the actual baud rate at higher baud rates. For non-standard baud
+        // rates, our wish and the actually returned baud rate may differ quite a bit.
+        33
+    } else {
+        // Expect about 0.5 percent accuracy for slower baud rates.
+        200
+    };
+    let delta = baud / divisor;
     baud.checked_sub(delta).unwrap()..baud.checked_add(delta).unwrap()
 }
 
