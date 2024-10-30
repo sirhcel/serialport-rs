@@ -24,16 +24,20 @@ fn check_baud_rate(port: &dyn SerialPort, baud: u32) {
 
 #[template]
 #[rstest]
-#[case(9600)]
-#[case(57600)]
-#[case(115200)]
+#[case(9_600)]
+#[case(57_600)]
+#[case(115_200)]
+#[case(921_600)]
+#[case(1_843_200)]
 fn standard_baud_rates(#[case] baud: u32) {}
 
 #[template]
 #[rstest]
-#[case(1000)]
-#[case(42000)]
-#[case(100000)]
+#[case(1_000)]
+#[case(42_000)]
+#[case(100_000)]
+#[case(1_000_000)]
+#[case(2_000_000)]
 fn non_standard_baud_rates(#[case] baud: u32) {}
 
 /// Test cases for setting the baud rate via [`SerialPortBuilder`].
