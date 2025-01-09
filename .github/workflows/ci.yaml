@@ -106,6 +106,24 @@ jobs:
       toolchain: "1.59.0"
 
   # --------------------------------------------------------------------------
+  # Semantic Versioning
+  #
+  # Check at least once per platform as we heavily depend on platform-specific
+  # code.
+
+  semver-aarch64-apple-darwin:
+    runs-on: ubuntu-latest
+    steps:
+    - run: |
+        # TODO: Harmonize with build.yaml
+        sudo sed -i 's/azure.archive.ubuntu.com/archive.ubuntu.com/' /etc/apt/sources.list
+        sudo apt-get -qq update
+        sudo apt-get -qq -y install build-essential curl git pkg-config libudev-dev
+    - uses: actions/checkout@v2
+    - uses: dtolnay/rust-toolchain@stable
+    - uses: obi1kenobi/cargo-semver-checks-action@v2
+
+  # --------------------------------------------------------------------------
   # cargo-deny
 
   cargo-deny:
