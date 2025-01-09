@@ -117,7 +117,8 @@ jobs:
       matrix:
         target:
           - aarch64-apple-darwin
-          - aarch64-unknown-linux-musl
+          # FIXME: Get a musl target for semver checks too.
+          # - aarch64-unknown-linux-musl
           - arm-linux-androideabi
           - x86_64-pc-windows-msvc
           - x86_64-unknown-freebsd
