@@ -117,13 +117,14 @@ jobs:
       matrix:
         target:
           - aarch64-apple-darwin
-          # FIXME: Get a musl target for semver checks too.
-          # - aarch64-unknown-linux-musl
           - arm-linux-androideabi
           - x86_64-pc-windows-msvc
           - x86_64-unknown-freebsd
           - x86_64-unknown-linux-gnu
           - x86_64-unknown-netbsd
+        feature-group:
+          - "only-explicit-features"
+          - "all-features"
     steps:
     - run: |
         # TODO: Harmonize with build.yaml
@@ -138,6 +139,7 @@ jobs:
     - uses: obi1kenobi/cargo-semver-checks-action@v2
       with:
         rust-target: ${{ matrix.target }}
+        feature-group: ${{ matrix.feature-group }}
 
   # --------------------------------------------------------------------------
   # cargo-deny
