@@ -125,6 +125,7 @@ jobs:
         feature-group:
           - "only-explicit-features"
           - "all-features"
+      fail-fast: false
     steps:
     - run: |
         # TODO: Harmonize with build.yaml
