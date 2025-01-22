@@ -32,6 +32,7 @@ impl From<nix::Error> for Error {
             E::EINTR => K::Io(IO::Interrupted),
             E::EACCES => K::Io(IO::PermissionDenied),
             E::ENOENT => K::Io(IO::NotFound),
+            E::ENOTTY => K::Io(IO::Unsupported),
             _ => K::Unknown,
         };
         Error::new(kind, e.desc())
