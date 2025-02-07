@@ -182,6 +182,7 @@ fn test_timeout_greater_zero(hw_config: HardwareConfig, #[case] timeout: Duratio
 /// Checks that reading data with a timeout of `Duration::MAX` returns some data and no error. It
 /// does not check the actual timeout for obvious reason.
 #[rstest]
+#[timeout(Duration::from_secs(15))]
 #[cfg_attr(feature = "ignore-hardware-tests", ignore)]
 fn test_timeout_max(hw_config: HardwareConfig) {
     let sleep = Duration::from_millis(3000);
