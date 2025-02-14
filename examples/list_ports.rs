@@ -1,6 +1,8 @@
 use serialport::{available_ports, SerialPortType};
 
 fn main() {
+    tracing_subscriber::fmt::init();
+
     match available_ports() {
         Ok(mut ports) => {
             // Let's output ports in a stable order to facilitate comparing the output from
