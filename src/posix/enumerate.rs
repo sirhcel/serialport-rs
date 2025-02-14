@@ -496,9 +496,12 @@ cfg_if! {
             Ok(vec)
         }
     } else if #[cfg(all(target_os = "linux", not(target_env = "musl"), feature = "libudev"))] {
+        use tracing::Level;
+
         /// Scans the system for serial ports and returns a list of them.
         /// The `SerialPortInfo` struct contains the name of the port
         /// which can be used for opening it.
+        #[tracing::instrument]
         pub fn available_ports() -> Result<Vec<SerialPortInfo>> {
             let mut vec = Vec::new();
             if let Ok(context) = libudev::Context::new() {
@@ -506,17 +509,31 @@ cfg_if! {
                 enumerator.match_subsystem("tty")?;
                 let devices = enumerator.scan_devices()?;
                 for d in devices {
+                    let device_span = tracing::span!(Level::DEBUG, "device", devnode = ?d.devnode());
+                    let _device_guard = device_span.enter();
+                    tracing::debug!(
+                        subsystem = ?d.subsystem(),
+                        sysname = ?d.sysname(),
+                        sysnum = ?d.sysnum(),
+                        devtype = ?d.devtype(),
+                        driver = ?d.driver(),
+                        devnode = ?d.devnode(),
+                        has_parent = d.parent().is_some(),
+                        "inspecting device",
+                    );
                     if let Some(p) = d.parent() {
                         if let Some(devnode) = d.devnode() {
                             if let Some(path) = devnode.to_str() {
                                 if let Some(driver) = p.driver() {
                                     if driver == "serial8250" && crate::new(path, 9600).open().is_err() {
+                                        tracing::debug!(cause = "can't open port", "rejected");
                                         continue;
                                     }
                                 }
                                 // Stop bubbling up port_type errors here so problematic ports are just
                                 // skipped instead of causing no ports to be returned.
                                 if let Ok(pt) = port_type(&d) {
+                                    tracing::debug!(port_type = ?pt, "accepted");
                                     vec.push(SerialPortInfo {
                                         port_name: String::from(path),
                                         port_type: pt,
@@ -533,6 +550,7 @@ cfg_if! {
         use std::fs::File;
         use std::io::Read;
         use std::path::Path;
+        use tracing::Level;
 
         fn read_file_to_trimmed_string(dir: &Path, file: &str) -> Option<String> {
             let path = dir.join(file);
@@ -596,16 +614,21 @@ cfg_if! {
         }
 
         /// Scans `/sys/class/tty` for serial devices (on Linux systems without libudev).
+        #[tracing::instrument]
         pub fn available_ports() -> Result<Vec<SerialPortInfo>> {
             let mut vec = Vec::new();
             let sys_path = Path::new("/sys/class/tty/");
             let dev_path = Path::new("/dev");
             for path in sys_path.read_dir().expect("/sys/class/tty/ doesn't exist on this system") {
+                let path_span = tracing::span!(Level::DEBUG, "path", path = ?path);
+                let _path_guard = path_span.enter();
+
                 let raw_path = path?.path().clone();
                 let mut path = raw_path.clone();
 
                 path.push("device");
                 if !path.is_dir() {
+                    tracing::debug!(cause = "no device dir", "rejected");
                     continue;
                 }
 
@@ -614,9 +637,11 @@ cfg_if! {
                 // TODO: Switch to a likely more readable let-else statement when our MSRV supports
                 // it.
                 let port_type = read_port_type(&path);
+                tracing::trace!(port_type = ?port_type);
                 let port_type = if let Some(port_type) = port_type {
                     port_type
                 } else {
+                    tracing::debug!(cause = "no port type", "rejected");
                     continue;
                 };
 
@@ -627,10 +652,13 @@ cfg_if! {
                 // See https://github.com/serialport/serialport-rs/issues/66 for details.
                 if let Some(file_name) = raw_path.file_name() {
                     let device_file = dev_path.join(file_name);
+                    tracing::trace!(device_file = ?device_file);
                     if !device_file.exists() {
+                        tracing::debug!(cause = "no device file", "rejected");
                         continue;
                     }
 
+                    tracing::debug!("accepted");
                     vec.push(SerialPortInfo {
                         port_name: device_file.to_string_lossy().to_string(),
                         port_type,
