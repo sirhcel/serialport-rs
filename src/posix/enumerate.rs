@@ -518,10 +518,18 @@ cfg_if! {
                         devtype = ?d.devtype(),
                         driver = ?d.driver(),
                         devnode = ?d.devnode(),
-                        has_parent = d.parent().is_some(),
-                        "inspecting device",
+                        "device",
                     );
                     if let Some(p) = d.parent() {
+                        tracing::debug!(
+                            subsystem = ?p.subsystem(),
+                            sysname = ?p.sysname(),
+                            sysnum = ?p.sysnum(),
+                            devtype = ?p.devtype(),
+                            driver = ?p.driver(),
+                            devnode = ?p.devnode(),
+                            "parent",
+                        );
                         if let Some(devnode) = d.devnode() {
                             if let Some(path) = devnode.to_str() {
                                 if let Some(driver) = p.driver() {
