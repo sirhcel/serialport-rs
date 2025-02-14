@@ -496,7 +496,14 @@ cfg_if! {
             Ok(vec)
         }
     } else if #[cfg(all(target_os = "linux", not(target_env = "musl"), feature = "libudev"))] {
-        use tracing::Level;
+        fn is_rfcomm(device: &libudev::Device) -> bool {
+            device
+                .sysname()
+                .and_then(|o| o.to_str())
+                .map(|s| s.starts_with("rfcomm"))
+                .unwrap_or(false)
+
+        }
 
         /// Scans the system for serial ports and returns a list of them.
         /// The `SerialPortInfo` struct contains the name of the port
@@ -509,7 +516,7 @@ cfg_if! {
                 enumerator.match_subsystem("tty")?;
                 let devices = enumerator.scan_devices()?;
                 for d in devices {
-                    let device_span = tracing::span!(Level::DEBUG, "device", devnode = ?d.devnode());
+                    let device_span = tracing::span!(tracing::Level::DEBUG, "device", devnode = ?d.devnode());
                     let _device_guard = device_span.enter();
                     tracing::debug!(
                         subsystem = ?d.subsystem(),
@@ -530,23 +537,26 @@ cfg_if! {
                             devnode = ?p.devnode(),
                             "parent",
                         );
-                        if let Some(devnode) = d.devnode() {
-                            if let Some(path) = devnode.to_str() {
-                                if let Some(driver) = p.driver() {
-                                    if driver == "serial8250" && crate::new(path, 9600).open().is_err() {
-                                        tracing::debug!(cause = "can't open port", "rejected");
-                                        continue;
-                                    }
+                    }
+
+                    if let Some(devnode) =  d.devnode().and_then(|o| o.to_str()) {
+                        let parent = d.parent();
+                        if parent.is_some() || is_rfcomm(&d) {
+                            if let Some(driver) = parent.as_ref().and_then(|d| d.driver()) {
+                                if driver == "serial8250" && crate::new(devnode, 9600).open().is_err() {
+                                    tracing::debug!(cause = "can't open port", "rejected");
+                                    continue;
                                 }
-                                // Stop bubbling up port_type errors here so problematic ports are just
-                                // skipped instead of causing no ports to be returned.
-                                if let Ok(pt) = port_type(&d) {
-                                    tracing::debug!(port_type = ?pt, "accepted");
-                                    vec.push(SerialPortInfo {
-                                        port_name: String::from(path),
-                                        port_type: pt,
-                                    });
-                                }
+                            }
+
+                            // Stop bubbling up port_type errors here so problematic ports are just
+                            // skipped instead of causing no ports to be returned.
+                            if let Ok(pt) = port_type(&d) {
+                                tracing::debug!(port_type = ?pt, "accepted");
+                                vec.push(SerialPortInfo {
+                                    port_name: String::from(devnode),
+                                    port_type: pt,
+                                });
                             }
                         }
                     }
