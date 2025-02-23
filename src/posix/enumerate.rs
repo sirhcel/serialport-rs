@@ -172,6 +172,7 @@ fn port_type(d: &libudev::Device) -> Result<SerialPortType> {
                 Ok(SerialPortType::PciPort)
             }
         }
+        None if is_rfcomm(d) => Ok(SerialPortType::BluetoothPort),
         None => find_usb_interface_from_parents(d.parent())
             .and_then(get_modalias_from_device)
             .as_deref()
@@ -502,7 +503,6 @@ cfg_if! {
                 .and_then(|o| o.to_str())
                 .map(|s| s.starts_with("rfcomm"))
                 .unwrap_or(false)
-
         }
 
         /// Scans the system for serial ports and returns a list of them.
