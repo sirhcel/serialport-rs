@@ -570,6 +570,15 @@ cfg_if! {
         use std::path::Path;
         use tracing::Level;
 
+        #[tracing::instrument(ret)]
+        fn is_rfcomm(path: &Path) -> bool {
+            path
+                .file_name()
+                .and_then(|o| o.to_str())
+                .map(|s| s.starts_with("rfcomm"))
+                .unwrap_or(false)
+        }
+
         fn read_file_to_trimmed_string(dir: &Path, file: &str) -> Option<String> {
             let path = dir.join(file);
             let mut s = String::new();
@@ -644,23 +653,27 @@ cfg_if! {
                 let raw_path = path?.path().clone();
                 let mut path = raw_path.clone();
 
-                path.push("device");
-                if !path.is_dir() {
-                    tracing::debug!(cause = "no device dir", "rejected");
-                    continue;
-                }
-
-                // Determine port type and proceed, if it's a known.
-                //
-                // TODO: Switch to a likely more readable let-else statement when our MSRV supports
-                // it.
-                let port_type = read_port_type(&path);
-                tracing::trace!(port_type = ?port_type);
-                let port_type = if let Some(port_type) = port_type {
-                    port_type
+                let port_type = if is_rfcomm(&raw_path) {
+                    SerialPortType::BluetoothPort
                 } else {
-                    tracing::debug!(cause = "no port type", "rejected");
-                    continue;
+                    path.push("device");
+                    if !path.is_dir() {
+                        tracing::debug!(cause = "no device dir", "rejected");
+                        continue;
+                    }
+
+                    // Determine port type and proceed, if it's a known.
+                    //
+                    // TODO: Switch to a likely more readable let-else statement when our MSRV supports
+                    // it.
+                    let port_type = read_port_type(&path);
+                    tracing::trace!(port_type = ?port_type);
+                    if let Some(port_type) = port_type {
+                        port_type
+                    } else {
+                        tracing::debug!(cause = "no port type", "rejected");
+                        continue;
+                    }
                 };
 
                 // Generate the device file path `/dev/DEVICE` from the TTY class path
