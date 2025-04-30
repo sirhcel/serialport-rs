@@ -111,7 +111,6 @@ impl TTYPort {
             OFlag::O_RDWR | OFlag::O_NOCTTY | OFlag::O_NONBLOCK | OFlag::O_CLOEXEC,
             nix::sys::stat::Mode::empty(),
         )?;
-        let fd = unsafe { OwnedFd::from_raw_fd(fd) };
 
         // Try to claim exclusive access to the port. This is performed even
         // if the port will later be set as non-exclusive, in order to respect
@@ -158,7 +157,7 @@ impl TTYPort {
         }
 
         // clear O_NONBLOCK flag
-        fcntl(fd.as_raw_fd(), F_SETFL(nix::fcntl::OFlag::empty()))?;
+        fcntl(fd.as_fd(), F_SETFL(nix::fcntl::OFlag::empty()))?;
 
         // Configure the low-level port settings
         let mut termios = termios::get_termios(fd.as_raw_fd())?;
@@ -308,7 +307,6 @@ impl TTYPort {
             OFlag::O_RDWR | OFlag::O_NOCTTY | OFlag::O_NONBLOCK,
             nix::sys::stat::Mode::empty(),
         )?;
-        let fd = unsafe { OwnedFd::from_raw_fd(fd) };
 
         // Set the port to a raw state. Using these ports will not work without this.
         let mut termios = MaybeUninit::uninit();
@@ -322,7 +320,7 @@ impl TTYPort {
         unsafe { crate::posix::tty::libc::tcsetattr(fd.as_raw_fd(), libc::TCSANOW, &termios) };
 
         fcntl(
-            fd.as_raw_fd(),
+            fd.as_fd(),
             nix::fcntl::FcntlArg::F_SETFL(nix::fcntl::OFlag::empty()),
         )?;
 
@@ -375,7 +373,7 @@ impl TTYPort {
     /// This function returns an error if the serial port couldn't be cloned.
     pub fn try_clone_native(&self) -> Result<TTYPort> {
         let fd_cloned: i32 = fcntl(
-            self.fd.as_raw_fd(),
+            self.fd.as_fd(),
             nix::fcntl::F_DUPFD_CLOEXEC(self.fd.as_raw_fd()),
         )?;
         Ok(TTYPort {
@@ -446,7 +444,7 @@ impl io::Read for TTYPort {
             return Err(io::Error::from(Error::from(e)));
         }
 
-        nix::unistd::read(self.fd.as_raw_fd(), buf).map_err(|e| io::Error::from(Error::from(e)))
+        nix::unistd::read(self.fd.as_fd(), buf).map_err(|e| io::Error::from(Error::from(e)))
     }
 }
 
