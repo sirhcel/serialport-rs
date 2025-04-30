@@ -109,7 +109,6 @@ impl TTYPort {
             OFlag::O_RDWR | OFlag::O_NOCTTY | OFlag::O_NONBLOCK | OFlag::O_CLOEXEC,
             nix::sys::stat::Mode::empty(),
         )?;
-        let fd = unsafe { OwnedFd::from_raw_fd(fd) };
 
         // Set the requested access mode on the port. In exclusive mode use
         // TIOCEXCL and an exclusive flock to prevent other openers. In shared
@@ -157,10 +156,7 @@ impl TTYPort {
         }
 
         // clear O_NONBLOCK flag
-        fcntl(
-            fd.as_raw_fd(),
-            FcntlArg::F_SETFL(nix::fcntl::OFlag::empty()),
-        )?;
+        fcntl(fd.as_fd(), FcntlArg::F_SETFL(OFlag::empty()))?;
 
         // Configure the low-level port settings
         let mut termios = termios::get_termios(fd.as_raw_fd())?;
@@ -312,9 +308,6 @@ impl TTYPort {
             OFlag::O_RDWR | OFlag::O_NOCTTY | OFlag::O_NONBLOCK,
             nix::sys::stat::Mode::empty(),
         )?;
-        // SAFETY: We obtained `fd` from `open` right above and we have not leaked it to anywhere
-        // else.
-        let fd = unsafe { OwnedFd::from_raw_fd(fd) };
 
         // Set the port to a raw state. Using these ports will not work without this.
         let mut termios = MaybeUninit::uninit();
@@ -325,7 +318,7 @@ impl TTYPort {
         Errno::result(unsafe { libc::tcsetattr(fd.as_raw_fd(), libc::TCSANOW, &termios) })?;
 
         fcntl(
-            fd.as_raw_fd(),
+            fd.as_fd(),
             nix::fcntl::FcntlArg::F_SETFL(nix::fcntl::OFlag::empty()),
         )?;
 
@@ -378,7 +371,7 @@ impl TTYPort {
     /// This function returns an error if the serial port couldn't be cloned.
     pub fn try_clone_native(&self) -> Result<TTYPort> {
         let fd_cloned: i32 = fcntl(
-            self.fd.as_raw_fd(),
+            self.fd.as_fd(),
             nix::fcntl::F_DUPFD_CLOEXEC(self.fd.as_raw_fd()),
         )?;
         // SAFETY: We obtained `fd_cloned` from cloning it via `fcntl` right above and we have not
@@ -454,7 +447,7 @@ impl io::Read for TTYPort {
             return Err(io::Error::from(Error::from(e)));
         }
 
-        nix::unistd::read(self.fd.as_raw_fd(), buf).map_err(|e| io::Error::from(Error::from(e)))
+        nix::unistd::read(self.fd.as_fd(), buf).map_err(|e| io::Error::from(Error::from(e)))
     }
 }
 
