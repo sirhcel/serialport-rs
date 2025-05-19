@@ -62,7 +62,7 @@ jobs:
         run: |
           sudo sed -i 's/azure.archive.ubuntu.com/archive.ubuntu.com/' /etc/apt/sources.list
           sudo apt-get -qq update
-          sudo apt-get -qq -y install build-essential curl git pkg-config ${{ inputs.extra_packages }}
+          sudo apt-get -qq -y install build-essential curl git pkg-config socat ${{ inputs.extra_packages }}
 
       - name: Build | add mingw32 to path
         if: inputs.runs_on == 'windows-2025'
