@@ -1,19 +1,27 @@
-How to test `serialport-rs` for development.
+# How to test `serialport-rs` for development.
 
-Without hardware:
+## Automated Tests
+
+### Prerequisites
+
+#### Linux
+
+* Have `socat` installed
+
+### Without hardware:
 
  1. Compilation
  2. `cargo test`
 
-With a single unconnected device:
+### With a single unconnected device:
 
 `cargo run --example hardware_check <DEVICE>`
 
-And when wired in a physical loopback mode:
+### And when wired in a physical loopback mode:
 
 `cargo run --example hardware_check <DEVICE> --loopback`
 
-With two devices connected to each other:
+### With two devices connected to each other:
 
  * `cargo run --example hardware_check <DEVICE1> --loopback-port <DEVICE2>`
  * Also `cargo run --example heartbeat <DEVICE1> <BAUD>` in one terminal and
@@ -24,6 +32,8 @@ With two devices connected to each other:
      $ export SERIALPORT_TEST_PORT_2=$(realpath /dev/ttyY)
      $ cargo test --features hardware-tests
      ```
+
+## Manual testing
 
 Can also verify trickier settings (like non-standard baud rates) using serial terminal programs
 like:
