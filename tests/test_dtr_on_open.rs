@@ -24,8 +24,8 @@ fn wait_for_file<P: AsRef<Path>>(path: P, timeout: Duration) -> Result<(), ()> {
 /// Check that a pseudo terminal can be opened without an error even in case the baud rate is not
 /// set to zero.
 #[test]
-#[cfg_attr(not(target_os = "linux"), ignore)]
-fn test_open_pty_linux() {
+#[cfg_attr(not(any(target_os = "linux", target_os = "macos")), ignore)]
+fn test_open_pty_posix() {
     // Create temp dir and pseudo terminal paths.
     let tmp_dir = TempDir::new().unwrap();
     let our_pty = tmp_dir.path().join("ttyV0");
