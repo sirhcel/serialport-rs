@@ -859,11 +859,15 @@ pub fn new<'a>(path: impl Into<std::borrow::Cow<'a, str>>, baud_rate: u32) -> Se
         parity: Parity::None,
         stop_bits: StopBits::One,
         timeout: Duration::from_millis(0),
-        // By default, set DTR when opening the device. There are USB devices performing "wait for
-        // DTR" before sending any data and users stumbled over this multiple times (see issues #29
-        // and #204). We are expecting little to no negative consequences from setting DTR by
-        // default but less hassle for users.
-        dtr_on_open: Some(true),
+        // Leave DTR alone when opening. I tried to activate this feature as a curtesy to users of
+        // some embedded systems and expected little to no negative consequences. The reality check
+        // proved this false and so I'm reverting this until we sort out the issues we've seen
+        // since then it the field so far.
+        //
+        // See issues #239 and #268 for the previous updates.
+        //
+        // TODO: Find a better approach and reactivate setting DTR by default.
+        dtr_on_open: None,
     }
 }
 
