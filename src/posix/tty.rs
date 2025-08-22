@@ -1,14 +1,15 @@
-use std::mem::MaybeUninit;
 use std::os::unix::prelude::*;
 use std::path::Path;
 use std::time::{Duration, Instant};
 use std::{io, mem};
 
 use nix::fcntl::{fcntl, OFlag};
+use nix::sys::termios::{ControlFlags, FlushArg, SetArg};
 use nix::{libc, unistd};
 
 use crate::posix::ioctl::{self, SerialLines};
 use crate::posix::termios;
+use crate::posix::termios::TermiosShim;
 use crate::{
     ClearBuffer, DataBits, Error, ErrorKind, FlowControl, Parity, Result, SerialPort,
     SerialPortBuilder, StopBits,
@@ -116,7 +117,6 @@ impl TTYPort {
     /// * `Io` for any other error while opening or initializing the device.
     pub fn open(builder: &SerialPortBuilder) -> Result<TTYPort> {
         use nix::fcntl::FcntlArg::F_SETFL;
-        use nix::libc::{cfmakeraw, tcgetattr, tcsetattr};
 
         let path = Path::new(&builder.path);
         let fd = OwnedFd(nix::fcntl::open(
@@ -130,31 +130,24 @@ impl TTYPort {
         // other applications that may have an exclusive port lock.
         ioctl::tiocexcl(fd.0)?;
 
-        let mut termios = MaybeUninit::uninit();
-        nix::errno::Errno::result(unsafe { tcgetattr(fd.0, termios.as_mut_ptr()) })?;
-        let mut termios = unsafe { termios.assume_init() };
+        let mut termios = nix::sys::termios::tcgetattr(fd.0)?;
 
         // setup TTY for binary serial port access
         // Enable reading from the port and ignore all modem control lines
-        termios.c_cflag |= libc::CREAD | libc::CLOCAL;
+        termios
+            .control_flags
+            .set(ControlFlags::CREAD | ControlFlags::CLOCAL, true);
         // Enable raw mode which disables any implicit processing of the input or output data streams
         // This also sets no timeout period and a read will block until at least one character is
         // available.
-        unsafe { cfmakeraw(&mut termios) };
+        nix::sys::termios::cfmakeraw(&mut termios);
 
         // write settings to TTY
-        unsafe { tcsetattr(fd.0, libc::TCSANOW, &termios) };
+        nix::sys::termios::tcsetattr(fd.0, SetArg::TCSANOW, &termios)?;
 
         // Read back settings from port and confirm they were applied correctly
-        let mut actual_termios = MaybeUninit::uninit();
-        unsafe { tcgetattr(fd.0, actual_termios.as_mut_ptr()) };
-        let actual_termios = unsafe { actual_termios.assume_init() };
-
-        if actual_termios.c_iflag != termios.c_iflag
-            || actual_termios.c_oflag != termios.c_oflag
-            || actual_termios.c_lflag != termios.c_lflag
-            || actual_termios.c_cflag != termios.c_cflag
-        {
+        let read_back = nix::sys::termios::tcgetattr(fd.0)?;
+        if read_back != termios {
             return Err(Error::new(
                 ErrorKind::Unknown,
                 "Settings did not apply correctly",
@@ -163,24 +156,31 @@ impl TTYPort {
 
         #[cfg(any(target_os = "ios", target_os = "macos"))]
         if builder.baud_rate > 0 {
-            unsafe { libc::tcflush(fd.0, libc::TCIOFLUSH) };
+            nix::sys::termios::tcflush(fd.0, FlushArg::TCIOFLUSH)?;
         }
 
         // clear O_NONBLOCK flag
         fcntl(fd.0, F_SETFL(nix::fcntl::OFlag::empty()))?;
 
         // Configure the low-level port settings
-        let mut termios = termios::get_termios(fd.0)?;
-        termios::set_parity(&mut termios, builder.parity);
-        termios::set_flow_control(&mut termios, builder.flow_control);
-        termios::set_data_bits(&mut termios, builder.data_bits);
-        termios::set_stop_bits(&mut termios, builder.stop_bits);
+        let mut termios = nix::sys::termios::tcgetattr(fd.0)?;
+        termios.set_parity(builder.parity);
+        termios.set_flow_control(builder.flow_control);
+        termios.set_data_bits(builder.data_bits);
+        termios.set_stop_bits(builder.stop_bits);
+
+        // FIXME: Use the termios API for setting baud rate only on non-Apple targets?
         #[cfg(not(any(target_os = "ios", target_os = "macos")))]
-        termios::set_baud_rate(&mut termios, builder.baud_rate)?;
+        nix::sys::termios::cfsetispeed(&mut termios, builder.baud_rate)?;
+        #[cfg(not(any(target_os = "ios", target_os = "macos")))]
+        nix::sys::termios::cfsetospeed(&mut termios, builder.baud_rate)?;
+
+        nix::sys::termios::tcsetattr(fd.0, SetArg::TCSANOW, &termios)?;
+
         #[cfg(any(target_os = "ios", target_os = "macos"))]
-        termios::set_termios(fd.0, &termios, builder.baud_rate)?;
-        #[cfg(not(any(target_os = "ios", target_os = "macos")))]
-        termios::set_termios(fd.0, &termios)?;
+        if builder.baud_rate > 0 {
+            crate::posix::ioctl::iossiospeed(fd.0, &(builder.baud_rate as nix::libc::speed_t))?;
+        }
 
         // Return the final port object
         let mut port = TTYPort {
@@ -304,15 +304,15 @@ impl TTYPort {
         )?;
 
         // Set the port to a raw state. Using these ports will not work without this.
-        let mut termios = MaybeUninit::uninit();
-        let res = unsafe { crate::posix::tty::libc::tcgetattr(fd, termios.as_mut_ptr()) };
-        if let Err(e) = nix::errno::Errno::result(res) {
-            close(fd);
-            return Err(e.into());
-        }
-        let mut termios = unsafe { termios.assume_init() };
-        unsafe { crate::posix::tty::libc::cfmakeraw(&mut termios) };
-        unsafe { crate::posix::tty::libc::tcsetattr(fd, libc::TCSANOW, &termios) };
+        let mut termios = match nix::sys::termios::tcgetattr(fd) {
+            Ok(t) => t,
+            Err(e) => {
+                close(fd);
+                return Err(e.into());
+            }
+        };
+        nix::sys::termios::cfmakeraw(&mut termios);
+        nix::sys::termios::tcsetattr(fd, SetArg::TCSANOW, &termios)?;
 
         fcntl(
             fd,
@@ -405,12 +405,12 @@ impl IntoRawFd for TTYPort {
 /// Get the baud speed for a port from its file descriptor
 #[cfg(any(target_os = "ios", target_os = "macos"))]
 fn get_termios_speed(fd: RawFd) -> u32 {
-    let mut termios = MaybeUninit::uninit();
-    let res = unsafe { libc::tcgetattr(fd, termios.as_mut_ptr()) };
-    nix::errno::Errno::result(res).expect("Failed to get termios data");
-    let termios = unsafe { termios.assume_init() };
-    assert_eq!(termios.c_ospeed, termios.c_ispeed);
-    termios.c_ospeed as u32
+    let termios = nix::sys::termios::tcgetattr(fd).expect("Failed to get termios data");
+    let ispeed = nix::sys::termios::cfgetispeed(&termios);
+    let ospeed = nix::sys::termios::cfgetospeed(&termios);
+
+    assert_eq!(ospeed, ispeed);
+    ospeed
 }
 
 impl FromRawFd for TTYPort {
@@ -772,31 +772,37 @@ impl SerialPort for TTYPort {
     }
 }
 
-#[test]
-fn test_ttyport_into_raw_fd() {
-    // `master` must be used here as Dropping it causes slave to be deleted by the OS.
-    // TODO: Convert this to a statement-level attribute once
-    //       https://github.com/rust-lang/rust/issues/15701 is on stable.
-    // FIXME: Create a mutex across all tests for using `TTYPort::pair()` as it's not threadsafe
-    #![allow(unused_variables)]
-    let (master, slave) = TTYPort::pair().expect("Unable to create ptty pair");
+#[cfg(test)]
+mod test {
+    use super::*;
+    use std::mem::MaybeUninit;
 
-    // First test with the master
-    let master_fd = master.into_raw_fd();
-    let mut termios = MaybeUninit::uninit();
-    let res = unsafe { nix::libc::tcgetattr(master_fd, termios.as_mut_ptr()) };
-    if res != 0 {
+    #[test]
+    fn test_ttyport_into_raw_fd() {
+        // `master` must be used here as Dropping it causes slave to be deleted by the OS.
+        // TODO: Convert this to a statement-level attribute once
+        //       https://github.com/rust-lang/rust/issues/15701 is on stable.
+        // FIXME: Create a mutex across all tests for using `TTYPort::pair()` as it's not threadsafe
+        #![allow(unused_variables)]
+        let (master, slave) = TTYPort::pair().expect("Unable to create ptty pair");
+
+        // First test with the master
+        let master_fd = master.into_raw_fd();
+        let mut termios = MaybeUninit::uninit();
+        let res = unsafe { nix::libc::tcgetattr(master_fd, termios.as_mut_ptr()) };
+        if res != 0 {
+            close(master_fd);
+            panic!("tcgetattr on the master port failed");
+        }
+
+        // And then the slave
+        let slave_fd = slave.into_raw_fd();
+        let res = unsafe { nix::libc::tcgetattr(slave_fd, termios.as_mut_ptr()) };
+        if res != 0 {
+            close(slave_fd);
+            panic!("tcgetattr on the master port failed");
+        }
         close(master_fd);
-        panic!("tcgetattr on the master port failed");
-    }
-
-    // And then the slave
-    let slave_fd = slave.into_raw_fd();
-    let res = unsafe { nix::libc::tcgetattr(slave_fd, termios.as_mut_ptr()) };
-    if res != 0 {
         close(slave_fd);
-        panic!("tcgetattr on the master port failed");
     }
-    close(master_fd);
-    close(slave_fd);
 }

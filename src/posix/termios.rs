@@ -41,6 +41,103 @@ cfg_if! {
     }
 }
 
+pub(crate) trait TermiosShim {
+    fn set_parity(&mut self, parity: Parity);
+    fn set_flow_control(&mut self, flow: FlowControl);
+    fn set_data_bits(&mut self, bits: DataBits);
+    fn set_stop_bits(&mut self, bits: StopBits);
+}
+
+use nix::sys::termios::{ControlFlags, InputFlags};
+
+impl TermiosShim for nix::sys::termios::Termios {
+    fn set_parity(&mut self, parity: Parity) {
+        let cflags = &mut self.control_flags;
+        let iflags = &mut self.input_flags;
+
+        match parity {
+            Parity::None => {
+                // termios.termios.c_cflag &= !(libc::PARENB | libc::PARODD);
+                // termios.c_iflag &= !libc::INPCK;
+                // termios.c_iflag |= libc::IGNPAR;
+                cflags.set(ControlFlags::PARENB | ControlFlags::PARODD, false);
+                iflags.set(InputFlags::INPCK, false);
+                iflags.set(InputFlags::IGNPAR, true);
+            }
+            Parity::Odd => {
+                // termios.c_cflag |= libc::PARENB | libc::PARODD;
+                // termios.c_iflag |= libc::INPCK;
+                // termios.c_iflag &= !libc::IGNPAR;
+                cflags.set(ControlFlags::PARENB | ControlFlags::PARODD, true);
+                iflags.set(InputFlags::INPCK, true);
+                iflags.set(InputFlags::IGNPAR, false);
+            }
+            Parity::Even => {
+                // termios.c_cflag &= !libc::PARODD;
+                // termios.c_cflag |= libc::PARENB;
+                // termios.c_iflag |= libc::INPCK;
+                // termios.c_iflag &= !libc::IGNPAR;
+                cflags.set(ControlFlags::PARODD, false);
+                cflags.set(ControlFlags::PARENB, true);
+                iflags.set(InputFlags::INPCK, true);
+                iflags.set(InputFlags::IGNPAR, false);
+            }
+        }
+    }
+
+    fn set_flow_control(&mut self, flow: FlowControl) {
+        let cflags = &mut self.control_flags;
+        let iflags = &mut self.input_flags;
+
+        match flow {
+            FlowControl::None => {
+                // termios.c_iflag &= !(libc::IXON | libc::IXOFF);
+                // termios.c_cflag &= !libc::CRTSCTS;
+                iflags.set(InputFlags::IXON | InputFlags::IXOFF, false);
+                cflags.set(ControlFlags::CRTSCTS, false);
+            }
+            FlowControl::Software => {
+                // termios.c_iflag |= libc::IXON | libc::IXOFF;
+                // termios.c_cflag &= !libc::CRTSCTS;
+                iflags.set(InputFlags::IXON | InputFlags::IXOFF, true);
+                cflags.set(ControlFlags::CRTSCTS, false);
+            }
+            FlowControl::Hardware => {
+                // termios.c_iflag &= !(libc::IXON | libc::IXOFF);
+                // termios.c_cflag |= libc::CRTSCTS;
+                iflags.set(InputFlags::IXON | InputFlags::IXOFF, false);
+                cflags.set(ControlFlags::CRTSCTS, true);
+            }
+        }
+    }
+
+    fn set_data_bits(&mut self, bits: DataBits) {
+        let cflags = &mut self.control_flags;
+        let size = match bits {
+            DataBits::Five => ControlFlags::CS5,
+            DataBits::Six => ControlFlags::CS6,
+            DataBits::Seven => ControlFlags::CS7,
+            DataBits::Eight => ControlFlags::CS8,
+        };
+
+        // termios.c_cflag &= !libc::CSIZE;
+        // termios.c_cflag |= size;
+        cflags.set(ControlFlags::CSIZE, false);
+        cflags.set(size, true);
+    }
+
+    fn set_stop_bits(&mut self, bits: StopBits) {
+        let cflags = &mut self.control_flags;
+
+        match bits {
+            // StopBits::One => termios.c_cflag &= !libc::CSTOPB,
+            // StopBits::Two => termios.c_cflag |= libc::CSTOPB,
+            StopBits::One => cflags.set(ControlFlags::CSTOPB, false),
+            StopBits::Two => cflags.set(ControlFlags::CSTOPB, true),
+        };
+    }
+}
+
 // The termios struct isn't used for storing the baud rate, but it can be affected by other
 // calls in this lib to the IOSSIOSPEED ioctl. So whenever we get this struct, make sure to
 // reset the input & output baud rates to a safe default. This is accounted for by the
