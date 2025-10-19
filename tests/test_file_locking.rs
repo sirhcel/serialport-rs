@@ -7,7 +7,7 @@ use rstest::rstest;
 cfg_if! {
     if #[cfg(unix)] {
         use std::os::unix::prelude::*;
-        use nix::fcntl::FlockArg;
+        use nix::fcntl::{Flock, FlockArg};
         use nix::ioctl_none_bad;
         use serialport::ErrorKind;
         use std::fs::File;
@@ -57,8 +57,7 @@ fn second_open_fails_flock(hw_config: HardwareConfig) {
         .custom_flags(libc::O_NONBLOCK)
         .open(&hw_config.port_1)
         .unwrap();
-    let fd = first.as_raw_fd();
-    nix::fcntl::flock(fd, FlockArg::LockExclusiveNonblock).unwrap();
+    let _first_locked = Flock::lock(first, FlockArg::LockExclusiveNonblock).unwrap();
 
     // Now try to open the same port for a second time. This is expected to fail.
     let second = serialport::new(&hw_config.port_1, 115200).open();

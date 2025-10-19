@@ -118,7 +118,7 @@ impl TTYPort {
         ioctl::tiocexcl(fd.as_raw_fd())?;
 
         // Also use flock to lock the port
-        flock::lock_exclusive(fd.0)?;
+        flock::lock_exclusive(fd.as_raw_fd())?;
 
         let mut termios = MaybeUninit::uninit();
         nix::errno::Errno::result(unsafe { tcgetattr(fd.as_raw_fd(), termios.as_mut_ptr()) })?;
@@ -227,9 +227,9 @@ impl TTYPort {
         setting_result?;
 
         let flock_result = if exclusive {
-            flock::lock_exclusive(self.fd)
+            flock::lock_exclusive(self.fd.as_raw_fd())
         } else {
-            flock::lock_shared(self.fd)
+            flock::lock_shared(self.fd.as_raw_fd())
         };
 
         flock_result?;
