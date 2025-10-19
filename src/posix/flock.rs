@@ -9,6 +9,9 @@ use std::os::unix::prelude::*;
 /// This is used ensure that no other applications are using the port. This requires that the other
 /// application also uses flock, so this does not work with all applications.
 pub(crate) fn lock_exclusive(fd: RawFd) -> Result<()> {
+    // TODO: Decide and how to handle file locking on latest version of nix and migrate away from
+    // this now deprecated function.
+    #[allow(deprecated)]
     nix::fcntl::flock(fd, FlockArg::LockExclusiveNonblock).map_err(|e| {
         if e == nix::errno::Errno::EWOULDBLOCK {
             Error::new(
@@ -27,6 +30,9 @@ pub(crate) fn lock_exclusive(fd: RawFd) -> Result<()> {
 /// using a shared lock, but this makes sure that they cannot acquire an exclusive lock while we're
 /// using the port.
 pub(crate) fn lock_shared(fd: RawFd) -> Result<()> {
+    // TODO: Decide and how to handle file locking on latest version of nix and migrate away from
+    // this now deprecated function.
+    #[allow(deprecated)]
     nix::fcntl::flock(fd, FlockArg::LockSharedNonblock).map_err(|e| {
         if e == nix::errno::Errno::EWOULDBLOCK {
             Error::new(

@@ -21,7 +21,7 @@ use serialport::SerialPort;
 cfg_if! {
     if #[cfg(unix)] {
         use std::os::unix::prelude::*;
-        use nix::fcntl::FlockArg;
+        use nix::fcntl::{Flock, FlockArg};
         use nix::ioctl_none_bad;
 
         // Locally create a wrapper for the TIOCEXCL and TIOCNXCL ioctl.

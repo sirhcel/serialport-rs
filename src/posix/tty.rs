@@ -114,11 +114,16 @@ impl TTYPort {
         // TIOCEXCL and an exclusive flock to prevent other openers. In shared
         // mode we only need a shared flock to allow concurrent access.
         if builder.exclusive {
+            // Try to claim exclusive access to the port. This is performed even
+            // if the port will later be set as non-exclusive, in order to respect
+            // other applications that may have an exclusive port lock.
             ioctl::tiocexcl(fd.as_raw_fd())?;
+            // Also use flock to lock the port
             flock::lock_exclusive(fd.as_raw_fd())?;
         } else {
             flock::lock_shared(fd.as_raw_fd())?;
         }
+
         let mut termios = MaybeUninit::uninit();
         Errno::result(unsafe { libc::tcgetattr(fd.as_raw_fd(), termios.as_mut_ptr()) })?;
         let mut termios = unsafe { termios.assume_init() };
