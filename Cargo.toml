@@ -53,8 +53,10 @@ serde = { version = "1.0", features = ["derive"], optional = true }
 quote = ">=1, <=1.0.40"
 
 [dev-dependencies]
+anyhow = "1.0.100"
 assert_hex = "0.4.1"
 clap = { version = "3.1.6", features = ["derive"] }
+cobs = { version = "0.4.0", features = ["use_std"] }
 envconfig = "0.10.0"
 # TODES Remove pinning this subdependency (of clap) when we are bumping our
 # MSRV (libc raised its MSRV with a patch release 0.2.167 from 1.19.0 to
