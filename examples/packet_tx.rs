@@ -10,6 +10,8 @@ struct Cli {
     packet_size: usize,
     #[clap(long)]
     packets: usize,
+    #[clap(long)]
+    flush_each_packet: bool,
 }
 
 fn main() -> anyhow::Result<()> {
@@ -29,8 +31,26 @@ fn main() -> anyhow::Result<()> {
 
         assert_eq!(data.len(), cli.packet_size);
 
-        port.write_all(&data[..])?;
-        port.flush()?;
+        let mut timeouts = 0usize;
+
+        loop {
+            match port.write_all(&data[..]) {
+                Ok(()) => break,
+                Err(e) if matches!(e.kind(), std::io::ErrorKind::TimedOut) => {
+                    timeouts += 1;
+                    continue
+                }
+                e => e?,
+            }
+        }
+
+        if timeouts > 0 {
+            println!("timeouts: {timeouts}");
+        }
+
+        if cli.flush_each_packet {
+            port.flush()?;
+        }
     }
 
     Ok(())
