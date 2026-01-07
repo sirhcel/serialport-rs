@@ -49,8 +49,12 @@ fn get_ports_guids() -> Result<Vec<GUID>> {
         let mut num_guids: u32 = 1; // Initially assume that there is only 1 guid per name.
         let class_start_idx = guids.len(); // start idx for this name (for potential resize with multiple guids)
 
+        dbg!(class_name);
+
         // first attempt with size == 1, second with the size returned from the first try
-        for _ in 0..2 {
+        for attempt in 0..2 {
+            dbg!(attempt);
+
             guids.resize(class_start_idx + num_guids as usize, GUID::from_u128(0));
             let guid_buffer = &mut guids[class_start_idx..];
             // Find out how many GUIDs are associated with this class name.  num_guids will tell us how many there actually are.
@@ -62,12 +66,21 @@ fn get_ports_guids() -> Result<Vec<GUID>> {
                     &mut num_guids,
                 )
             };
+
+            dbg!(res);
+
             if res == FALSE {
                 return Err(Error::new(
                     ErrorKind::Unknown,
                     "Unable to determine number of Ports GUIDs",
                 ));
             }
+
+            if num_guids >= 1 && guid_buffer.len() >= 1 {
+                let first = guid_buffer[0];
+                dbg!((first.data1, first.data2, first.data3));
+            }
+
             let len_cmp = guid_buffer.len().cmp(&(num_guids as usize));
             // under allocated
             if len_cmp == std::cmp::Ordering::Less {
