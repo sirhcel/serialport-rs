@@ -9,7 +9,9 @@ use windows_sys::Win32::Devices::DeviceAndDriverInstallation::{
     CR_SUCCESS, DICS_FLAG_GLOBAL, DIGCF_PRESENT, DIREG_DEV, HDEVINFO, MAX_DEVICE_ID_LEN,
     SPDRP_FRIENDLYNAME, SPDRP_HARDWAREID, SPDRP_MFG, SP_DEVINFO_DATA,
 };
-use windows_sys::Win32::Foundation::{FALSE, FILETIME, INVALID_HANDLE_VALUE, MAX_PATH};
+use windows_sys::Win32::Foundation::{
+    GetLastError, FALSE, FILETIME, INVALID_HANDLE_VALUE, MAX_PATH,
+};
 use windows_sys::Win32::System::Registry::{
     RegCloseKey, RegEnumValueW, RegOpenKeyExW, RegQueryInfoKeyW, RegQueryValueExW, HKEY,
     HKEY_LOCAL_MACHINE, KEY_READ, REG_SZ,
@@ -70,9 +72,11 @@ fn get_ports_guids() -> Result<Vec<GUID>> {
             dbg!(res);
 
             if res == FALSE {
+                let last_error = unsafe { GetLastError() };
+                dbg!(last_error);
                 return Err(Error::new(
                     ErrorKind::Unknown,
-                    "Unable to determine number of Ports GUIDs",
+                    format!("Unable to determine number of Ports GUIDs ({last_error:#x})"),
                 ));
             }
 
