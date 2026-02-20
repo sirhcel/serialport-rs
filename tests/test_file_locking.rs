@@ -14,6 +14,7 @@ mod config;
 
 use cfg_if::cfg_if;
 use config::{hw_config, HardwareConfig};
+use nix::libc;
 use rstest::rstest;
 use serialport::ErrorKind;
 use serialport::SerialPort;
