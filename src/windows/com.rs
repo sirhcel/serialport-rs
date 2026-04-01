@@ -226,7 +226,10 @@ impl io::Read for COMPort {
             0 => Err(io::Error::last_os_error()),
             _ => {
                 if (to_read == 0 && read == 0) || (to_read > 0 && read != 0) {
-                    Ok(read as usize)
+                    let read: usize = read
+                        .try_into()
+                        .map_err(|e| io::Error::new(io::ErrorKind::InvalidData, e))?;
+                    Ok(read)
                 } else {
                     Err(io::Error::new(
                         io::ErrorKind::TimedOut,
@@ -258,7 +261,10 @@ impl io::Write for COMPort {
             0 => Err(io::Error::last_os_error()),
             _ => {
                 if (to_write == 0 && written == 0) || (to_write > 0 && written != 0) {
-                    Ok(written as usize)
+                    let written: usize = written
+                        .try_into()
+                        .map_err(|e| io::Error::new(io::ErrorKind::InvalidData, e))?;
+                    Ok(written)
                 } else {
                     Err(io::Error::new(
                         io::ErrorKind::TimedOut,
