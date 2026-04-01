@@ -465,8 +465,11 @@ impl FromRawFd for TTYPort {
 
 impl io::Read for TTYPort {
     fn read(&mut self, buf: &mut [u8]) -> io::Result<usize> {
-        if let Err(e) = super::poll::wait_read_fd(self.fd, self.timeout) {
-            return Err(io::Error::from(Error::from(e)));
+        // There is no point in waiting for data to be available for reading for an empty read.
+        if !buf.is_empty() {
+            if let Err(e) = super::poll::wait_read_fd(self.fd, self.timeout) {
+                return Err(io::Error::from(Error::from(e)));
+            }
         }
 
         nix::unistd::read(self.fd, buf).map_err(|e| io::Error::from(Error::from(e)))
@@ -475,8 +478,12 @@ impl io::Read for TTYPort {
 
 impl io::Write for TTYPort {
     fn write(&mut self, buf: &[u8]) -> io::Result<usize> {
-        if let Err(e) = super::poll::wait_write_fd(self.fd, self.timeout) {
-            return Err(io::Error::from(Error::from(e)));
+        // There is no point in waiting for the port to become ready to write at least some data
+        // for an empty write.
+        if !buf.is_empty() {
+            if let Err(e) = super::poll::wait_write_fd(self.fd, self.timeout) {
+                return Err(io::Error::from(Error::from(e)));
+            }
         }
 
         nix::unistd::write(self.fd, buf).map_err(|e| io::Error::from(Error::from(e)))
