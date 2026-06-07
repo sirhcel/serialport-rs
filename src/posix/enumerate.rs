@@ -270,22 +270,28 @@ fn get_parent_device_by_type(
     device: io_object_t,
     parent_type: *const c_char,
 ) -> Option<io_registry_entry_t> {
-    let parent_type = unsafe { CStr::from_ptr(parent_type) };
     use mach2::kern_return::KERN_SUCCESS;
+
+    let parent_type = unsafe { CStr::from_ptr(parent_type) };
     let mut device = device;
     loop {
         let mut class_name = MaybeUninit::<[c_char; 128]>::uninit();
-        unsafe { IOObjectGetClass(device, class_name.as_mut_ptr() as *mut c_char) };
+        if unsafe { IOObjectGetClass(device, class_name.as_mut_ptr() as *mut c_char) }
+            != KERN_SUCCESS
+        {
+            return None;
+        }
         let class_name = unsafe { class_name.assume_init() };
-        let name = unsafe { CStr::from_ptr(&class_name[0]) };
+
+        let name = unsafe { CStr::from_ptr(class_name.as_ptr()) };
         if name == parent_type {
             return Some(device);
         }
+
         let mut parent = MaybeUninit::uninit();
-        if unsafe {
-            IORegistryEntryGetParentEntry(device, kIOServiceClass, parent.as_mut_ptr())
-                != KERN_SUCCESS
-        } {
+        if unsafe { IORegistryEntryGetParentEntry(device, kIOServiceClass, parent.as_mut_ptr()) }
+            != KERN_SUCCESS
+        {
             return None;
         }
         device = unsafe { parent.assume_init() };
