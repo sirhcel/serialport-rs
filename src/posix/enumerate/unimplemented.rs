@@ -1,4 +1,4 @@
-use crate::{Error, ErrorKind, Result};
+use crate::{Error, ErrorKind, Result, SerialPortInfo};
 
 /// Enumerating serial ports on this platform is not supported
 pub fn available_ports() -> Result<Vec<SerialPortInfo>> {
