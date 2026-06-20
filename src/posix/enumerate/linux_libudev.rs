@@ -251,6 +251,7 @@ pub fn available_ports() -> Result<Vec<SerialPortInfo>> {
     Ok(vec)
 }
 
+#[cfg(test)]
 mod tests {
     use super::*;
 
